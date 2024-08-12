@@ -1,0 +1,11 @@
+<Application
+    x:Class="LingoShift.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<Application.Styles>
+		<FluentTheme />
+	</Application.Styles>
+	<Application.Resources>
+		<Bitmap x:Key="AppIcon">/Assets/app-icon.ico</Bitmap>
+	</Application.Resources>
+</Application>

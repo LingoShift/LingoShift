@@ -1,0 +1,53 @@
+<UserControl
+    x:Class="LingoShift.Views.MainView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="clr-namespace:LingoShift.ViewModels"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    x:DataType="vm:MainViewModel"
+    mc:Ignorable="d">
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.header">
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+        </Style>
+        <Style Selector="TextBlock.description">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Margin" Value="0,10"/>
+            <Setter Property="Padding" Value="10,5"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="LingoShift" Classes="header"/>
+            <TextBlock Classes="description">
+                Welcome to LingoShift! To use the application, simply select text and press your configured hotkey.
+                LingoShift will automatically translate the selected text using the current translation service.
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CurrentTranslationService, StringFormat='Current Translation Service: {0}'}" 
+                       HorizontalAlignment="Center" Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding LastTranslationStatus}" 
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <Button Grid.Row="2" 
+                Content="Open Settings" 
+                Command="{Binding OpenSettingsCommand}"
+                HorizontalAlignment="Center"/>
+    </Grid>
+</UserControl>

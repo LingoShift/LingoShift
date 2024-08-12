@@ -1,0 +1,74 @@
+<Window
+    x:Class="LingoShift.Views.TranslationPopup"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:LingoShift.Views"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="Translation Result"
+    Width="400"
+    Height="250"
+    MinHeight="250"
+    MaxHeight="400"
+    d:DesignHeight="300"
+    d:DesignWidth="400"
+    x:DataType="local:TranslationPopup"
+    Background="Transparent"
+    CanResize="False"
+    SystemDecorations="None"
+    TransparencyLevelHint="AcrylicBlur"
+    WindowStartupLocation="CenterScreen"
+    mc:Ignorable="d">
+	<Border ClipToBounds="True" CornerRadius="8">
+		<Panel>
+			<ExperimentalAcrylicBorder IsHitTestVisible="False">
+				<ExperimentalAcrylicBorder.Material>
+					<ExperimentalAcrylicMaterial
+                        BackgroundSource="Digger"
+                        MaterialOpacity="0.6"
+                        TintColor="#2c3e50"
+                        TintOpacity="0.6" />
+				</ExperimentalAcrylicBorder.Material>
+			</ExperimentalAcrylicBorder>
+
+			<Grid Margin="20" RowDefinitions="Auto,*,Auto">
+				<!--  Barra di titolo trascinabile  -->
+				<TextBlock
+                    Grid.Row="0"
+                    Margin="0,10,0,20"
+                    HorizontalAlignment="Center"
+                    FontSize="24"
+                    FontWeight="Light"
+                    Foreground="#ecf0f1"
+                    Text="Translation Result" />
+
+				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+					<TextBlock
+                        FontSize="16"
+                        Foreground="#ecf0f1"
+                        Text="{Binding TranslatedText}"
+                        TextWrapping="Wrap" />
+				</ScrollViewer>
+
+				<Button
+                    Grid.Row="2"
+                    Margin="0,20,0,0"
+                    HorizontalAlignment="Right"
+                    Click="CloseButton_Click"
+                    Content="Close">
+					<Button.Styles>
+						<Style Selector="Button">
+							<Setter Property="Background" Value="#3498db" />
+							<Setter Property="Foreground" Value="White" />
+							<Setter Property="Padding" Value="20,10" />
+							<Setter Property="CornerRadius" Value="4" />
+						</Style>
+						<Style Selector="Button:pointerover">
+							<Setter Property="Background" Value="#2980b9" />
+						</Style>
+					</Button.Styles>
+				</Button>
+			</Grid>
+		</Panel>
+	</Border>
+</Window>
