@@ -22,7 +22,7 @@ namespace LingoShift.Application.ApplicationServices
 
         public async Task<LlmResponseDto> GenerateResponse(LlmRequestDto request)
         {
-            var prompt = new LlmPrompt(request.Prompt);
+            var prompt = new LlmPrompt(request.Prompt, request.System);
             LlmResponse response;
 
             switch (request.Provider.ToLower())
@@ -41,6 +41,31 @@ namespace LingoShift.Application.ApplicationServices
             }
 
             return new LlmResponseDto { Content = response.Content };
+        }
+        public async IAsyncEnumerable<string> GenerateResponseStreamAsync(LlmRequestDto request)
+        {
+            var prompt = new LlmPrompt(request.Prompt, request.System);
+            IAsyncEnumerable<string> responseStream;
+
+            switch (request.Provider.ToLower())
+            {
+                case "openai":
+                    responseStream = _openAiService.GenerateResponseStreamAsync(prompt);
+                    break;
+                case "anthropic":
+                    responseStream = _anthropicService.GenerateResponseStreamAsync(prompt);
+                    break;
+                case "ollama":
+                    responseStream = _ollamaService.GenerateResponseStreamAsync(prompt);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid LLM provider specified", nameof(request.Provider));
+            }
+
+            await foreach (var chunk in responseStream)
+            {
+                yield return chunk;
+            }
         }
     }
 }

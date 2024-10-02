@@ -13,5 +13,6 @@ namespace LingoShift.Application.DTOs
         /// Default is OpenAI.
         /// </summary>
         public string Provider { get; set; } = "openai";
+        public string System { get; set; }
     }
 }

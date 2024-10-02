@@ -2,6 +2,8 @@
 
 public interface IClipboardService
 {
-    Task<string> GetTextAsync();
-    Task SetTextAsync(string text);
+    Task<string> GetClipBoardTextAsync();
+    Task SetClipBoardTextAsync(string text);
+    Task<string> SelectAllAndCopyTextAsync();
+    Task PasteTextAsync(string text);
 }

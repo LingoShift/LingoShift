@@ -1,21 +1,59 @@
 ﻿using Avalonia.Threading;
-using LingoShift.Application.Interfaces;
 using LingoShift.Views;
+using System;
+using LingoShift.Application.Interfaces;
 
-namespace LingoShift.Services
+namespace LingoShift.Services;
+
+public class AvaloniaPopupService : IPopupService
 {
-    public class AvaloniaPopupService : IPopupService
+    private TranslationPopup _popup;
+
+    public void ShowTranslationPopup(string translatedText)
     {
-        public void ShowTranslationPopup(string translatedText)
+        Dispatcher.UIThread.InvokeAsync(() =>
         {
-            Dispatcher.UIThread.InvokeAsync(() =>
+            if (_popup == null)
             {
-                var popup = new TranslationPopup
+                _popup = new TranslationPopup
                 {
                     TranslatedText = translatedText
                 };
-                popup.Show();
-            });
-        }
+                _popup.Closed += Popup_Closed;
+                _popup.Show();
+            }
+            else
+            {
+                _popup.TranslatedText = translatedText;
+            }
+        });
+    }
+
+    public void UpdateTranslationPopup(string translatedText)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_popup != null)
+            {
+                _popup.TranslatedText = translatedText;
+            }
+        });
+    }
+
+    public void CloseTranslationPopup()
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_popup != null)
+            {
+                _popup.Close();
+                _popup = null;
+            }
+        });
+    }
+
+    private void Popup_Closed(object sender, EventArgs e)
+    {
+        _popup = null;
     }
 }

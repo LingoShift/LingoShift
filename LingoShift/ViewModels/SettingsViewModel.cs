@@ -1,78 +1,124 @@
-using System.Collections.ObjectModel;
-using System.Windows.Input;
-using System.Linq;
+using Avalonia.ReactiveUI;
+using LingoShift.Application.ApplicationServices;
+using LingoShift.Application.Interfaces;
+using LingoShift.Domain.ValueObjects;
 using ReactiveUI;
-using System.Threading.Tasks;
-using LingoShift.Infrastructure.Repositories;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reactive;
+using System.Reactive.Concurrency;
+using System.Reactive.Linq;
+using System.Threading.Tasks;
 
 namespace LingoShift.ViewModels
 {
-    public class SettingsViewModel : ViewModelBase
+    public class SettingsViewModel : ReactiveObject
     {
-        private readonly SettingsRepository _settingsRepository;
+        private readonly ISettingsService _settingsService;
+        private readonly TranslationApplicationService _translationService;
+        private readonly IDispatcherService _dispatcherService;
 
-        private string _openAiApiKey;
-        public string OpenAiApiKey
+        private ObservableCollection<SequenceConfig> _sequences;
+        public ObservableCollection<SequenceConfig> Sequences
         {
-            get => _openAiApiKey;
-            set => this.RaiseAndSetIfChanged(ref _openAiApiKey, value);
+            get => _sequences;
+            private set => this.RaiseAndSetIfChanged(ref _sequences, value);
         }
 
-        public ObservableCollection<string> Sequences { get; } = new ObservableCollection<string>();
+        public List<SequenceAction> AvailableActions { get; } = SequenceAction.GetValues().ToList();
+        public List<Language> AvailableLanguages { get; } = Language.GetValues().ToList();
 
-        private string _newSequence;
-        public string NewSequence
+        private SequenceConfig _newSequenceConfig;
+        public SequenceConfig NewSequenceConfig
         {
-            get => _newSequence;
-            set => this.RaiseAndSetIfChanged(ref _newSequence, value);
+            get => _newSequenceConfig;
+            set => this.RaiseAndSetIfChanged(ref _newSequenceConfig, value);
         }
 
-        public ICommand AddSequenceCommand { get; }
-        public ReactiveCommand<string, Unit> RemoveSequenceCommand { get; }
-        public ICommand SaveSettingsCommand { get; }
+        public ReactiveCommand<Unit, Unit> AddSequenceCommand { get; }
+        public ReactiveCommand<SequenceConfig, Unit> RemoveSequenceCommand { get; }
+        public ReactiveCommand<Unit, Unit> SaveSettingsCommand { get; }
 
-        public SettingsViewModel(SettingsRepository settingsRepository)
+        public SettingsViewModel(ISettingsService settingsService, TranslationApplicationService translationService, IDispatcherService dispatcherService)
         {
-            _settingsRepository = settingsRepository;
+            _settingsService = settingsService;
+            _translationService = translationService;
+            _dispatcherService = dispatcherService;
 
-            AddSequenceCommand = ReactiveCommand.Create(AddSequence);
-            RemoveSequenceCommand = ReactiveCommand.Create<string>(RemoveSequence);
+            Sequences = new ObservableCollection<SequenceConfig>();
+
+            NewSequenceConfig = new SequenceConfig
+            {
+                Action = AvailableActions.First(),
+                TargetLanguage = AvailableLanguages.First()
+            };
+
+            var canAddSequence = this.WhenAnyValue(x => x.NewSequenceConfig.Sequence)
+                .Select(sequence => !string.IsNullOrWhiteSpace(sequence))
+                .ObserveOn(RxApp.MainThreadScheduler);
+
+            AddSequenceCommand = ReactiveCommand.CreateFromTask(AddSequence, canAddSequence);
+            RemoveSequenceCommand = ReactiveCommand.Create<SequenceConfig>(RemoveSequence);
             SaveSettingsCommand = ReactiveCommand.CreateFromTask(SaveSettings);
 
-            // Load initial settings
+            RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
+
             LoadSettings();
         }
 
-        private void AddSequence()
+        private async Task AddSequence()
         {
-            if (!string.IsNullOrWhiteSpace(NewSequence))
+            await _dispatcherService.InvokeAsync(() =>
             {
-                Sequences.Add(NewSequence);
-                NewSequence = string.Empty;
-            }
+                var newConfig = new SequenceConfig
+                {
+                    SequenceName = NewSequenceConfig.SequenceName,
+                    Sequence = NewSequenceConfig.Sequence,
+                    Action = AvailableActions.FirstOrDefault(a => a.Value == NewSequenceConfig.Action.Value) ?? AvailableActions.First(),
+                    TargetLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == NewSequenceConfig.TargetLanguage.Code) ?? AvailableLanguages.First(),
+                    UseLLM = NewSequenceConfig.UseLLM,
+                    ShowPopup = NewSequenceConfig.ShowPopup
+                };
+
+                Sequences.Add(newConfig);
+
+                NewSequenceConfig = new SequenceConfig
+                {
+                    Action = AvailableActions.First(),
+                    TargetLanguage = AvailableLanguages.First()
+                };
+            });
         }
 
-        private void RemoveSequence(string sequence)
+        private void RemoveSequence(SequenceConfig sequenceConfig)
         {
-            Sequences.Remove(sequence);
+            _dispatcherService.InvokeAsync(() =>
+            {
+                Sequences.Remove(sequenceConfig);
+            });
         }
 
         private async Task SaveSettings()
         {
-            await _settingsRepository.SetSettingAsync("OpenAiApiKey", OpenAiApiKey);
-            await _settingsRepository.SetSequencesAsync(Sequences);
+            var sequencesList = await _dispatcherService.InvokeAsync(() => Sequences.ToList());
+            await _settingsService.SetSequenceConfigsAsync(sequencesList);
+            await _translationService.RegisterSequencesAsync();
         }
 
         private async void LoadSettings()
         {
-            OpenAiApiKey = await _settingsRepository.GetSettingAsync("OpenAiApiKey");
-            var sequences = await _settingsRepository.GetSequencesAsync();
-            Sequences.Clear();
-            foreach (var sequence in sequences)
+            var sequenceConfigs = await _settingsService.GetSequenceConfigsAsync();
+            await _dispatcherService.InvokeAsync(() =>
             {
-                Sequences.Add(sequence);
-            }
+                Sequences.Clear();
+                foreach (var config in sequenceConfigs)
+                {
+                    config.Action = AvailableActions.FirstOrDefault(a => a.Value == config.Action.Value) ?? AvailableActions.First();
+                    config.TargetLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == config.TargetLanguage.Code) ?? AvailableLanguages.First();
+                    Sequences.Add(config);
+                }
+            });
         }
     }
 }

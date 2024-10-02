@@ -4,6 +4,7 @@ public interface IHotkeyService : IDisposable
 {
     void RegisterHotkey(string hotkeyName, HotkeyDefinition definition, Action action);
     void RegisterSequence(string sequenceName, string sequence, Action action);
+    void SendText(string text);
     void UnregisterHotkey(string hotkeyName);
 }
 

@@ -2,76 +2,138 @@
     x:Class="LingoShift.Views.SettingsView"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:LingoShift.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:domain="using:LingoShift.Domain.ValueObjects"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:LingoShift.ViewModels"
     d:DesignHeight="700"
     d:DesignWidth="600"
     x:DataType="vm:SettingsViewModel"
-    Background="#f0f0f0"
     mc:Ignorable="d">
 	<Design.DataContext>
 		<vm:SettingsViewModel />
 	</Design.DataContext>
+	<UserControl.Resources>
+		<converters:SequenceActionConverter x:Key="SequenceActionConverter" />
+		<converters:LanguageConverter x:Key="LanguageConverter" />
+	</UserControl.Resources>
 	<UserControl.Styles>
 		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="24" />
 			<Setter Property="FontWeight" Value="Bold" />
-			<Setter Property="FontSize" Value="16" />
-			<Setter Property="Margin" Value="0,10,0,5" />
+			<Setter Property="Margin" Value="0 0 0 20" />
 		</Style>
 		<Style Selector="TextBox">
-			<Setter Property="Margin" Value="0,0,0,10" />
+			<Setter Property="Margin" Value="0 5" />
+			<Setter Property="Padding" Value="10" />
+			<Setter Property="CornerRadius" Value="4" />
 		</Style>
 		<Style Selector="ComboBox">
-			<Setter Property="Margin" Value="0,0,0,10" />
+			<Setter Property="Margin" Value="0 5" />
+			<Setter Property="Padding" Value="10" />
+			<Setter Property="CornerRadius" Value="4" />
 		</Style>
 		<Style Selector="Button">
-			<Setter Property="Margin" Value="0,5" />
-			<Setter Property="Padding" Value="10,5" />
+			<Setter Property="Padding" Value="15 10" />
+			<Setter Property="CornerRadius" Value="4" />
+			<Setter Property="Background" Value="#007AFF" />
+			<Setter Property="Foreground" Value="White" />
+		</Style>
+		<Style Selector="CheckBox">
+			<Setter Property="Margin" Value="0 5" />
 		</Style>
 	</UserControl.Styles>
-	<ScrollViewer>
-		<Grid Margin="20" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-			<StackPanel Grid.Row="0">
-				<TextBlock Classes="header" Text="API Keys" />
-				<TextBlock Text="OpenAI API Key" />
-				<TextBox Text="{Binding OpenAiApiKey}" />
-			</StackPanel>
-			<StackPanel Grid.Row="2">
-				<TextBlock Classes="header" Text="Registered Sequences" />
-				<ItemsControl ItemsSource="{Binding Sequences}">
-					<ItemsControl.ItemTemplate>
-						<DataTemplate>
-							<Grid Margin="0,5" ColumnDefinitions="*, Auto">
-								<TextBox Grid.Column="0" Text="{Binding}" />
-								<Button
-                                    Grid.Column="1"
-                                    Margin="5,0,0,0"
-                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveSequenceCommand}"
-                                    CommandParameter="{Binding}"
-                                    Content="Remove" />
+
+	<Grid Background="#F0F0F0" RowDefinitions="Auto,*,Auto">
+		<TextBlock
+            Grid.Row="0"
+            Margin="20,20,20,0"
+            Classes="header"
+            Text="Registered Sequences" />
+
+		<ScrollViewer Grid.Row="1" Margin="0,10">
+			<ItemsControl Margin="20,0" ItemsSource="{Binding Sequences}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="domain:SequenceConfig">
+						<Border
+                            Margin="0,0,0,20"
+                            Padding="20"
+                            Background="White"
+                            BoxShadow="0 2 10 0 #15000000"
+                            CornerRadius="8">
+							<Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+								<TextBox
+                                    Grid.Row="0"
+                                    Text="{Binding SequenceName}"
+                                    Watermark="Sequence Name" />
+								<TextBox
+                                    Grid.Row="1"
+                                    Text="{Binding Sequence}"
+                                    Watermark="Sequence" />
+
+								<ComboBox
+                                    Grid.Row="2"
+                                    Margin="0,5"
+                                    ItemsSource="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).AvailableActions}"
+                                    SelectedItem="{Binding Action, Converter={StaticResource SequenceActionConverter}}">
+									<ComboBox.ItemTemplate>
+										<DataTemplate x:DataType="domain:SequenceAction">
+											<TextBlock Text="{Binding Value}" />
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+
+								<Grid Grid.Row="3" ColumnDefinitions="*,*">
+									<ComboBox
+                                        Grid.Column="0"
+                                        Margin="0,5"
+                                        ItemsSource="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).AvailableLanguages}"
+                                        SelectedItem="{Binding TargetLanguage, Converter={StaticResource LanguageConverter}}">
+										<ComboBox.ItemTemplate>
+											<DataTemplate x:DataType="domain:Language">
+												<TextBlock Text="{Binding Name}" />
+											</DataTemplate>
+										</ComboBox.ItemTemplate>
+									</ComboBox>
+									<CheckBox
+                                        Grid.Column="1"
+                                        Content="Use LLM"
+                                        IsChecked="{Binding UseLLM}" />
+								</Grid>
+
+								<Grid Grid.Row="4" ColumnDefinitions="*,*,Auto">
+									<CheckBox
+                                        Grid.Column="1"
+                                        Content="Show Popup"
+                                        IsChecked="{Binding ShowPopup}" />
+									<Button
+                                        Grid.Column="2"
+                                        Background="#FF3B30"
+                                        Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveSequenceCommand}"
+                                        CommandParameter="{Binding}"
+                                        Content="Remove" />
+								</Grid>
 							</Grid>
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
-			</StackPanel>
-			<Grid
-                Grid.Row="3"
-                Margin="0,10"
-                ColumnDefinitions="*, Auto">
-				<TextBox
-                    Grid.Column="0"
-                    Text="{Binding NewSequence}"
-                    Watermark="Enter new sequence" />
-				<Button
-                    Grid.Column="1"
-                    Margin="5,0,0,0"
-                    Command="{Binding AddSequenceCommand}"
-                    Content="Add" />
-			</Grid>
-			<StackPanel Grid.Row="5" HorizontalAlignment="Center">
-				<Button Command="{Binding SaveSettingsCommand}" Content="Save Settings" />
-			</StackPanel>
-		</Grid>
-	</ScrollViewer>
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</ScrollViewer>
+
+		<StackPanel
+            Grid.Row="2"
+            Margin="0,0,0,20"
+            HorizontalAlignment="Center"
+            Orientation="Horizontal">
+			<Button
+                Margin="0,0,10,0"
+                Command="{Binding AddSequenceCommand}"
+                Content="Add New Sequence" />
+			<Button
+                Background="#34C759"
+                Command="{Binding SaveSettingsCommand}"
+                Content="Save Settings" />
+		</StackPanel>
+	</Grid>
 </UserControl>

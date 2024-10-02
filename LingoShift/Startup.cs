@@ -5,12 +5,12 @@ using LingoShift.Infrastructure.Data;
 using LingoShift.Infrastructure.ExternalServices;
 using LingoShift.Infrastructure.PlatformSpecificServices;
 using LingoShift.Infrastructure.Repositories;
+using LingoShift.Infrastructure.Services;
 using LingoShift.Services;
 using LingoShift.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Net.Http;
 
 namespace LingoShift;
 
@@ -31,17 +31,27 @@ public static class Startup
             options.UseSqlite("Data Source=lingoshift.db"));
 
         services.AddScoped<SettingsRepository>();
+        services.AddSingleton<IDispatcherService, AvaloniaDispatcherService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
 
-        services.AddSingleton<ILlmService, OpenAiService>();
+        //services.AddSingleton<ILlmService, OpenAiService>();
         // services.AddSingleton<ILlmService, AnthropicService>();
-        // services.AddSingleton<ILlmService, OllamaService>();
+        services.AddSingleton<ILlmService, OllamaService>();
 
         services.AddSingleton<LlmApplicationService>();
 
         services.AddTransient<TranslationApplicationService>();
 
         services.AddTransient<MainViewModel>();
-        services.AddTransient<SettingsViewModel>();
+        services.AddTransient<SettingsViewModel>(provider =>
+            new SettingsViewModel(
+                provider.GetRequiredService<ISettingsService>(),
+                provider.GetRequiredService<TranslationApplicationService>(),
+                provider.GetRequiredService<IDispatcherService>()
+            )
+        );
+
+        services.AddSingleton<TrayIconManager>();
     }
 
     public static void InitializeDatabase(IServiceProvider serviceProvider)

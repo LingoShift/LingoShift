@@ -1,15 +1,18 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Markup.Xaml;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using System;
+using System.ComponentModel;
 
 namespace LingoShift.Views
 {
-    public partial class TranslationPopup : Window
+    public partial class TranslationPopup : Window, INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
         public TranslationPopup()
         {
             InitializeComponent();
@@ -22,10 +25,11 @@ namespace LingoShift.Views
             TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur };
             Background = Brushes.Transparent;
 
-            // Opzionale: abilita l'ombra della finestra
-            // this.HasSystemDecorations = false;
-            // this.TransparencyBackgroundFallback = Brushes.Transparent;
-            // this.UseLayoutRounding = true;
+            // Rimuovi i decori di sistema
+            SystemDecorations = SystemDecorations.None;
+
+            // Imposta l'evento per permettere il trascinamento della finestra
+            PointerPressed += OnPointerPressedTitleBar;
         }
 
         private void InitializeComponent()
@@ -33,13 +37,18 @@ namespace LingoShift.Views
             AvaloniaXamlLoader.Load(this);
         }
 
-        public static readonly StyledProperty<string> TranslatedTextProperty =
-            AvaloniaProperty.Register<TranslationPopup, string>(nameof(TranslatedText));
-
+        private string _translatedText;
         public string TranslatedText
         {
-            get => GetValue(TranslatedTextProperty);
-            set => SetValue(TranslatedTextProperty, value);
+            get => _translatedText;
+            set
+            {
+                if (_translatedText != value)
+                {
+                    _translatedText = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TranslatedText)));
+                }
+            }
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

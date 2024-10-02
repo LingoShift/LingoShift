@@ -1,3 +1,4 @@
+<!--  XAML per TranslationPopup.xaml  -->
 <Window
     x:Class="LingoShift.Views.TranslationPopup"
     xmlns="https://github.com/avaloniaui"
@@ -46,7 +47,7 @@
 					<TextBlock
                         FontSize="16"
                         Foreground="#ecf0f1"
-                        Text="{Binding TranslatedText}"
+                        Text="{Binding TranslatedText, Mode=OneWay}"
                         TextWrapping="Wrap" />
 				</ScrollViewer>
 

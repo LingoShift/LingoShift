@@ -6,8 +6,7 @@ using Avalonia.Controls;
 using System;
 using LingoShift.Application.Interfaces;
 using LingoShift.Services;
-using LingoShift.ViewModels;
-using LingoShift.Infrastructure.Repositories;
+using Avalonia.Threading;
 
 namespace LingoShift
 {
@@ -27,27 +26,32 @@ namespace LingoShift
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 _desktopLifetime = desktop;
-
                 var services = new ServiceCollection();
                 Startup.ConfigureServices(services);
-                Startup.InitializeDatabase(services.BuildServiceProvider());
-                services.AddSingleton<IPopupService, AvaloniaPopupService>();
                 _serviceProvider = services.BuildServiceProvider();
 
-                var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
-                var settingsrepository = _serviceProvider.GetRequiredService<SettingsRepository>();
-
-                _trayIconManager = new TrayIconManager(mainViewModel, settingsrepository);
-                _trayIconManager.Initialize();
-
-                var translationService = _serviceProvider.GetRequiredService<TranslationApplicationService>();
-                translationService.RegisterDefaultHotkeys();
-
-                var popupService = _serviceProvider.GetRequiredService<IPopupService>();
-                translationService.TranslationCompleted += (sender, e) =>
+                // Inizializza il database e altri servizi sul thread dell'UI
+                Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    popupService.ShowTranslationPopup(e.TranslatedText);
-                };
+                    Startup.InitializeDatabase(_serviceProvider);
+
+                    _trayIconManager = _serviceProvider.GetRequiredService<TrayIconManager>();
+                    _trayIconManager.Initialize();
+
+                    var translationService = _serviceProvider.GetRequiredService<TranslationApplicationService>();
+                    translationService.RegisterDefaultSequencesAsync();
+
+                    var popupService = _serviceProvider.GetRequiredService<IPopupService>();
+                    var dispatcherService = _serviceProvider.GetRequiredService<IDispatcherService>();
+
+                    translationService.TranslationCompleted += (sender, e) =>
+                    {
+                        dispatcherService.InvokeAsync(() =>
+                        {
+                            popupService.ShowTranslationPopup(e.TranslatedText);
+                        });
+                    };
+                });
 
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
@@ -55,6 +59,7 @@ namespace LingoShift
 
             base.OnFrameworkInitializationCompleted();
         }
+
 
         private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
         {

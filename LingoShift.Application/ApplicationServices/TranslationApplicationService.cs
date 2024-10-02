@@ -1,132 +1,248 @@
-﻿using LingoShift.Application.DTOs;
+using LingoShift.Application.DTOs;
 using LingoShift.Application.Interfaces;
 using LingoShift.Domain.Aggregates;
 using LingoShift.Domain.ValueObjects;
 using LingoShift.Domain.DomainServices;
 using LingoShift.Application.Events;
 using System.Diagnostics;
+using System.Text;
+using System.Reflection;
 
 namespace LingoShift.Application.ApplicationServices
 {
     public class TranslationApplicationService
     {
+        private readonly IDispatcherService _dispatcherService;
+
         private readonly ITranslationProvider _translationProvider;
         private readonly IClipboardService _clipboardService;
         private readonly IHotkeyService _hotkeyService;
         private readonly IPopupService _popupService;
         private readonly LlmApplicationService _llmService;
+        private readonly ISettingsService _settingsService;
+
+        private readonly List<SequenceConfig> _defaultSequences =
+        [
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerOpenEn",
+                Sequence = "<en",
+                TargetLanguage = Language.English,
+                Action = SequenceAction.Translate,
+                UseLLM = false,
+                ShowPopup = true
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerOpenIt",
+                Sequence = "<it",
+                TargetLanguage = Language.Italian,
+                Action = SequenceAction.Translate,
+                UseLLM = false,
+                ShowPopup = true
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerReplaceEn",
+                Sequence = "<ren",
+                TargetLanguage = Language.English,
+                Action = SequenceAction.TranslateAndReplace,
+                UseLLM = false,
+                ShowPopup = false
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerReplaceIt",
+                Sequence = "<rit",
+                TargetLanguage = Language.Italian,
+                Action = SequenceAction.TranslateAndReplace,
+                UseLLM = false,
+                ShowPopup = false
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerLlmIt",
+                Sequence = "<lmit",
+                TargetLanguage = Language.Italian,
+                Action = SequenceAction.Translate,
+                UseLLM = true,
+                ShowPopup = true
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerLlmEn",
+                Sequence = "<lmen",
+                TargetLanguage = Language.English,
+                Action = SequenceAction.Translate,
+                UseLLM = true,
+                ShowPopup = true
+            },
+             new SequenceConfig
+            {
+                SequenceName = "LingoTriggerLlmReplaceIt",
+                Sequence = "<rlmit",
+                TargetLanguage = Language.Italian,
+                Action = SequenceAction.TranslateAndReplace,
+                UseLLM = true,
+                ShowPopup = false
+            },
+            new SequenceConfig
+            {
+                SequenceName = "LingoTriggerLlmReplaceEn",
+                Sequence = "<rlmen",
+                TargetLanguage = Language.English,
+                Action = SequenceAction.TranslateAndReplace,
+                UseLLM = true,
+                ShowPopup = false
+            },
+        ];
 
         public event EventHandler<TranslationCompletedEvent> TranslationCompleted;
+        public event EventHandler<TranslationProgressUpdatedEvent> TranslationProgressUpdated;
+
+
+        private List<SequenceConfig> _sequenceConfigs;
 
         public TranslationApplicationService(
             ITranslationProvider translationProvider,
             IClipboardService clipboardService,
             IHotkeyService hotkeyService,
             LlmApplicationService llmService,
-            IPopupService popupService)
+            IPopupService popupService,
+            IDispatcherService dispatcherService,
+            ISettingsService settingsService)
         {
             _translationProvider = translationProvider;
             _clipboardService = clipboardService;
             _hotkeyService = hotkeyService;
             _llmService = llmService;
             _popupService = popupService;
+            _settingsService = settingsService;
+            _dispatcherService = dispatcherService;
         }
 
-        public void RegisterDefaultHotkeys()
+        public async Task RegisterSequencesAsync()
         {
-            _hotkeyService.RegisterSequence("LingoTriggerOpenEn", "<openen", async () => await TranslateAndShowPopupAsync("en"));
-            _hotkeyService.RegisterSequence("LingoTriggerOpenIt", "<openit", async () => await TranslateAndShowPopupAsync("it"));
-
-            _hotkeyService.RegisterSequence("LingoTriggerReplaceEn", "<repen", async () => await TranslateAndReplaceAsync("en"));
-            _hotkeyService.RegisterSequence("LingoTriggerReplaceIt", "<repit", async () => await TranslateAndReplaceAsync("it"));
-
-            _hotkeyService.RegisterSequence("LingoTriggerLlmIt", "<llmit", async () => await TranslateAndShowPopupWithLlmAsync("Italian"));
-            _hotkeyService.RegisterSequence("LingoTriggerLlmEn", "<llmen", async () => await TranslateAndShowPopupWithLlmAsync("English"));
-
-            _hotkeyService.RegisterSequence("LingoTriggerLlmFormattedIt", "<llmfmit", async () => await TranslateAndShowPopupWithLlmFormattedAsync("Italian"));
-            _hotkeyService.RegisterSequence("LingoTriggerLlmFormattedEn", "<llfmen", async () => await TranslateAndShowPopupWithLlmFormattedAsync("English"));
-        }
-
-        private async Task TranslateAndReplaceAsync(string targetLanguage)
-        {
-            Debug.WriteLine($"Translating to {targetLanguage} and replacing clipboard text");
-
-            var sourceText = await _clipboardService.GetTextAsync();
-            var result = await TranslateAsync(new TranslationRequestDto
+            _sequenceConfigs = await _settingsService.GetSequenceConfigsAsync();
+            foreach (var config in _sequenceConfigs)
             {
-                SourceText = sourceText,
-                SourceLanguageCode = "auto",
-                TargetLanguageCode = targetLanguage
-            });
-            await _clipboardService.SetTextAsync(result.TranslatedText);
+                _hotkeyService.RegisterSequence(config.SequenceName, config.Sequence, () => ExecuteSequenceAction(config));
+            }
         }
 
-        private async Task TranslateAndShowPopupAsync(string targetLanguage)
+        public async Task RegisterDefaultSequencesAsync()
         {
-            Debug.WriteLine($"Translating to {targetLanguage} and showing popup");
+            await _settingsService.SetSequenceConfigsAsync(_defaultSequences);
+            await RegisterSequencesAsync();
+        }
 
-            var sourceText = await _clipboardService.GetTextAsync();
-            var result = await TranslateAsync(new TranslationRequestDto
+        private async Task ExecuteSequenceAction(SequenceConfig config)
+        {
+            await Task.Delay(200);
+            var sourceText = await _clipboardService.SelectAllAndCopyTextAsync();
+            Debug.WriteLine($"Testo copiato: {sourceText}");
+
+            int sequenceIndex = sourceText.LastIndexOf(config.Sequence);
+            if (sequenceIndex >= 0)
             {
-                SourceText = sourceText,
-                SourceLanguageCode = "auto",
-                TargetLanguageCode = targetLanguage
-            });
-            OnTranslationCompleted(new TranslationCompletedEvent(result.TranslatedText));
-        }
+                sourceText = sourceText.Remove(sequenceIndex, config.Sequence.Length);
+                Debug.WriteLine($"Testo dopo la rimozione della sequenza: {sourceText}");
+            }
 
-        public async Task TranslateAndShowPopupWithLlmAsync(string targetLanguage)
-        {
-            Debug.WriteLine($"Translating to {targetLanguage} using LLM and showing popup");
+            string result;
 
-            var llmRequest = new LlmRequestDto
+            if (config.UseLLM)
             {
-                Prompt = $"Translate the following text to {targetLanguage}:\n\n" + await _clipboardService.GetTextAsync(),
-                Provider = "openai"
-            };
-            var result = await _llmService.GenerateResponse(llmRequest);
-
-            OnTranslationCompleted(new TranslationCompletedEvent(result.Content));
-        }
-
-        public async Task TranslateAndShowPopupWithLlmFormattedAsync(string targetLanguage)
-        {
-            Debug.WriteLine($"Translating to {targetLanguage} using LLM and showing popup");
-
-            var prompt = $"Translate the following text to {targetLanguage}:\n\n" + await _clipboardService.GetTextAsync();
-            string instructions = "Please translate the text using formal language and include bullet points for lists. Ensure correct punctuation, grammar, spelling, capitalization, tone, style, formatting, structure, terminology, register, voice, and tense.";
-            string example = "Example translation: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.'";
-            var llmRequest = new LlmRequestDto
+                await TranslateWithLlm(sourceText, config);
+                return;
+            }
+            else
             {
-                Prompt = prompt + "\n\n" + instructions + "\n\n" + example,
-                Provider = "openai"
-            };
+                result = await TranslateWithProvider(sourceText, config.TargetLanguage.Code, config.Action);
+            }
 
-            var result = await _llmService.GenerateResponse(llmRequest);
+            Debug.WriteLine($"Risultato della traduzione: {result}");
 
-            OnTranslationCompleted(new TranslationCompletedEvent(result.Content));
+            if (config.Action.Equals(SequenceAction.TranslateAndReplace))
+            {
+                await _clipboardService.PasteTextAsync(result);
+            }
+
+
+            if (config.ShowPopup)
+            {
+                OnTranslationCompleted(result);
+            }
         }
 
-        protected virtual void OnTranslationCompleted(TranslationCompletedEvent e)
+        private async Task<string> TranslateWithProvider(string sourceText, string targetLanguage, string action)
         {
-            TranslationCompleted?.Invoke(this, e);
-        }
-
-        public async Task<TranslationResultDto> TranslateAsync(TranslationRequestDto request)
-        {
-            var sourceLanguage = new Language(request.SourceLanguageCode, "");
-            var targetLanguage = new Language(request.TargetLanguageCode, "");
-            var translation = new Translation(new SourceText(request.SourceText), sourceLanguage, targetLanguage);
-
+            Debug.WriteLine($"Translating to {targetLanguage} using provider and showing popup");
+            var translation = new Translation(new SourceText(sourceText), new Language("auto", ""), new Language(targetLanguage, ""));
             var translatedText = await _translationProvider.TranslateAsync(translation.Source.Value, translation.TargetLanguage.Code);
-            translation.SetResult(new TranslatedText(translatedText));
+            return translatedText;
+        }
 
-            return new TranslationResultDto
+        private async Task<string> TranslateWithLlm(string sourcetext, SequenceConfig config)
+        {
+            // Define the system prompt to set the model's role
+            string systemPrompt = "You are a professional translator who only translates texts. Do not answer any questions or perform tasks other than translation. Provide only the translated text without any additional commentary or explanation.";
+
+            // Create the prompt to send to the model
+            string prompt = $@"
+            Text to translate:
+            ""{sourcetext}""
+
+            Translate into {config.TargetLanguage.Name}:
+            ";
+
+            var llmRequest = new LlmRequestDto
             {
-                SourceText = translation.Source.Value,
-                TranslatedText = translation.Result.Value,
-                TargetLanguageCode = translation.TargetLanguage.Code
+                Prompt = prompt,
+                Provider = "ollama",
+                System = systemPrompt
             };
+
+            var result = new StringBuilder();
+
+            if (config.Action.Equals(SequenceAction.Translate) && config.ShowPopup)
+            {
+                _popupService.ShowTranslationPopup(string.Empty);
+            }
+
+            await foreach (var chunk in _llmService.GenerateResponseStreamAsync(llmRequest))
+            {
+                result.Append(chunk);
+
+                if (config.ShowPopup)
+                {
+                    _popupService.UpdateTranslationPopup(result.ToString());
+                }
+
+                if (config.Action.Equals(SequenceAction.TranslateAndReplace))
+                {
+                    _hotkeyService.SendText(chunk);
+                }
+            }
+
+            return result.ToString();
+        }
+
+
+        protected virtual void OnTranslationProgressUpdated(string partialResult, bool isCompleted)
+        {
+            _dispatcherService.InvokeAsync(() =>
+            {
+                TranslationProgressUpdated?.Invoke(this, new TranslationProgressUpdatedEvent(partialResult, isCompleted));
+            });
+        }
+
+        protected virtual void OnTranslationCompleted(string translatedText)
+        {
+            _dispatcherService.InvokeAsync(() =>
+            {
+                TranslationCompleted?.Invoke(this, new TranslationCompletedEvent(translatedText));
+            });
         }
     }
 }

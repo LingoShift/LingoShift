@@ -10,6 +10,68 @@ namespace LingoShift.Infrastructure.PlatformSpecificServices
 {
     public class WindowsHotkeyService : IHotkeyService
     {
+        #region SendText
+        [DllImport("user32.dll")]
+        private static extern uint SendInput(uint nInputs, [MarshalAs(UnmanagedType.LPArray), In] INPUT[] pInputs, int cbSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint type;
+            public InputUnion u;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct InputUnion
+        {
+            [FieldOffset(0)]
+            public KEYBDINPUT ki;
+            [FieldOffset(0)]
+            public MOUSEINPUT mi;
+            [FieldOffset(0)]
+            public HARDWAREINPUT hi;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT
+        {
+            public ushort wVk;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct HARDWAREINPUT
+        {
+            public uint uMsg;
+            public ushort wParamL;
+            public ushort wParamH;
+        }
+
+        private const int INPUT_MOUSE = 0;
+        private const int INPUT_KEYBOARD = 1;
+        private const int INPUT_HARDWARE = 2;
+
+        private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const uint KEYEVENTF_UNICODE = 0x0004;
+        private const uint KEYEVENTF_SCANCODE = 0x0008;
+
+        #endregion
+
         [DllImport("user32.dll")]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
@@ -32,16 +94,42 @@ namespace LingoShift.Infrastructure.PlatformSpecificServices
         private IntPtr _hookID = IntPtr.Zero;
         private LowLevelKeyboardProc _proc;
         private readonly Dictionary<string, (HotkeyDefinition definition, Action action)> _registeredHotkeys = new Dictionary<string, (HotkeyDefinition, Action)>();
-        private readonly Dictionary<string, (string sequence, Action action)> _registeredSequences = new Dictionary<string, (string, Action)>();
+        private readonly Dictionary<string, (string sequence, Action action, Func<Task> asyncAction)> _registeredSequences = new Dictionary<string, (string, Action, Func<Task>)>();
         private List<Keys> _keySequence = new List<Keys>();
         private StringBuilder _charSequence = new StringBuilder();
         private DateTime _lastKeyPressTime = DateTime.MinValue;
         private const int MAX_SEQUENCE_DELAY = 5000; // milliseconds
+        private bool _isProcessingSequence = false;
 
         public WindowsHotkeyService()
         {
             _proc = HookCallback;
             _hookID = SetHook(_proc);
+        }
+
+        public void SendText(string text)
+        {
+            List<INPUT> inputs = new List<INPUT>();
+
+            foreach (char c in text)
+            {
+                INPUT inputDown = new INPUT();
+                inputDown.type = INPUT_KEYBOARD;
+                inputDown.u.ki.wScan = 0;
+                inputDown.u.ki.wVk = 0;
+                inputDown.u.ki.dwFlags = KEYEVENTF_UNICODE;
+                inputDown.u.ki.time = 0;
+                inputDown.u.ki.dwExtraInfo = IntPtr.Zero;
+                inputDown.u.ki.wScan = (ushort)c;
+
+                INPUT inputUp = inputDown;
+                inputUp.u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+
+                inputs.Add(inputDown);
+                inputs.Add(inputUp);
+            }
+
+            SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
         }
 
         private IntPtr SetHook(LowLevelKeyboardProc proc)
@@ -58,22 +146,25 @@ namespace LingoShift.Infrastructure.PlatformSpecificServices
             if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
             {
                 int vkCode = Marshal.ReadInt32(lParam);
-                ProcessKeyPress((Keys)vkCode);
+                Task.Run(() => ProcessKeyPress((Keys)vkCode)).Wait();
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
 
-        private void ProcessKeyPress(Keys key)
+        private async Task ProcessKeyPress(Keys key)
         {
+            if (_isProcessingSequence)
+            {
+                return; // Evita l'elaborazione ricorsiva delle sequenze
+            }
+
             var currentTime = DateTime.Now;
             if ((currentTime - _lastKeyPressTime).TotalMilliseconds > MAX_SEQUENCE_DELAY)
             {
-                _keySequence.Clear();
                 _charSequence.Clear();
             }
             _lastKeyPressTime = currentTime;
 
-            _keySequence.Add(key);
             char? keyChar = KeyToChar(key);
             if (keyChar.HasValue)
             {
@@ -95,12 +186,28 @@ namespace LingoShift.Infrastructure.PlatformSpecificServices
                     if (currentSequence.EndsWith(sequence.Value.sequence, StringComparison.OrdinalIgnoreCase))
                     {
                         Debug.WriteLine($"Sequence triggered: {sequence.Key}");
-                        sequence.Value.action.Invoke();
-                        _charSequence.Clear();
+                        _isProcessingSequence = true;
+
+                        if (sequence.Value.asyncAction != null)
+                        {
+                            await sequence.Value.asyncAction.Invoke();
+                        }
+                        else
+                        {
+                            sequence.Value.action?.Invoke();
+                        }
+
+                        _isProcessingSequence = false;
+
+                        // Rimuovi solo la sequenza attivata, non l'intero buffer
+                        int startIndex = _charSequence.Length - sequence.Value.sequence.Length;
+                        _charSequence.Remove(startIndex, sequence.Value.sequence.Length);
+
                         return;
                     }
                 }
             }
+
 
             // Controlla i trigger delle hotkey
             foreach (var hotkey in _registeredHotkeys)
@@ -146,8 +253,14 @@ namespace LingoShift.Infrastructure.PlatformSpecificServices
 
         public void RegisterSequence(string sequenceName, string sequence, Action action)
         {
-            _registeredSequences[sequenceName] = (sequence.ToLower(), action);
+            _registeredSequences[sequenceName] = (sequence.ToLower(), action, null);
             Debug.WriteLine($"Registered sequence: {sequenceName} ({sequence.ToLower()})");
+        }
+
+        public void RegisterAsyncSequence(string sequenceName, string sequence, Func<Task> asyncAction)
+        {
+            _registeredSequences[sequenceName] = (sequence.ToLower(), null, asyncAction);
+            Debug.WriteLine($"Registered async sequence: {sequenceName} ({sequence.ToLower()})");
         }
 
         public void DebugPrintRegisteredSequences()

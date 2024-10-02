@@ -9,3 +9,14 @@ public class TranslationCompletedEvent
         TranslatedText = translatedText;
     }
 }
+public class TranslationProgressUpdatedEvent : EventArgs
+{
+    public string PartialResult { get; }
+    public bool IsCompleted { get; }
+
+    public TranslationProgressUpdatedEvent(string partialResult, bool isCompleted)
+    {
+        PartialResult = partialResult;
+        IsCompleted = isCompleted;
+    }
+}

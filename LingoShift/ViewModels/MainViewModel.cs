@@ -2,13 +2,12 @@ using System.Reactive;
 using ReactiveUI;
 using Avalonia.Controls;
 using LingoShift.Views;
-using LingoShift.Infrastructure.Repositories;
 
 namespace LingoShift.ViewModels
 {
     public class MainViewModel : ViewModelBase
     {
-        private readonly SettingsRepository _settingsRepository;
+        private readonly SettingsViewModel _settingsViewModel;
 
         private string _currentTranslationService;
         public string CurrentTranslationService
@@ -26,22 +25,22 @@ namespace LingoShift.ViewModels
 
         public ReactiveCommand<Unit, Unit> OpenSettingsCommand { get; }
 
-        public MainViewModel(SettingsRepository settingsRepository)
+        public MainViewModel(SettingsViewModel settingsViewModel)
         {
-            _settingsRepository = settingsRepository;
             OpenSettingsCommand = ReactiveCommand.Create(OpenSettings);
             CurrentTranslationService = "Not set"; // Default value
             LastTranslationStatus = "No translation performed yet"; // Default value
+            _settingsViewModel = settingsViewModel;
+
         }
 
         private void OpenSettings()
         {
-            var settingsViewModel = new SettingsViewModel(_settingsRepository);
             var settingsWindow = new Window
             {
                 Content = new SettingsView
                 {
-                    DataContext = settingsViewModel
+                    DataContext = _settingsViewModel
                 },
                 Title = "Settings",
                 Width = 400,

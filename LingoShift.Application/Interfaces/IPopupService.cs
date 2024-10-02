@@ -3,4 +3,6 @@
 public interface IPopupService
 {
     void ShowTranslationPopup(string translatedText);
+    void UpdateTranslationPopup(string translatedText);
+    void CloseTranslationPopup();
 }

@@ -11,13 +11,25 @@ public class WindowsClipboardService : IClipboardService
         _textService = textService;
     }
 
-    public async Task<string> GetTextAsync()
+    public async Task<string> GetClipBoardTextAsync()
     {
-        return await _textService.GetSelectedTextAsync();
+        return await _textService.GetClipboardTextAsync();
     }
 
-    public async Task SetTextAsync(string text)
+    public async Task<string> SelectAllAndCopyTextAsync()
     {
-        await _textService.ReplaceSelectedTextAsync(text);
+        return await _textService.SelectCopyAndGetTextAsync();
     }
+
+    public async Task PasteTextAsync(string text)
+    {
+        await _textService.SetClipboardTextAsync(text);
+        await _textService.PasteFromClipboardAsync();
+    }
+
+    public async Task SetClipBoardTextAsync(string text)
+    {
+        await _textService.SetClipboardTextAsync(text);
+    }
+
 }

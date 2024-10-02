@@ -41,5 +41,10 @@ namespace LingoShift.Infrastructure.ExternalServices
 
             return new LlmResponse(generatedText);
         }
+
+        public IAsyncEnumerable<string> GenerateResponseStreamAsync(LlmPrompt prompt)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
