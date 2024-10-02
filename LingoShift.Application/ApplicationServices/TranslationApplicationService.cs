@@ -229,13 +229,13 @@ namespace LingoShift.Application.ApplicationServices
         }
 
 
-        protected virtual void OnTranslationProgressUpdated(string partialResult, bool isCompleted)
-        {
-            _dispatcherService.InvokeAsync(() =>
-            {
-                TranslationProgressUpdated?.Invoke(this, new TranslationProgressUpdatedEvent(partialResult, isCompleted));
-            });
-        }
+        //protected virtual void OnTranslationProgressUpdated(string partialResult, bool isCompleted)
+        //{
+        //    _dispatcherService.InvokeAsync(() =>
+        //    {
+        //        TranslationProgressUpdated?.Invoke(this, new TranslationProgressUpdatedEvent(partialResult, isCompleted));
+        //    });
+        //}
 
         protected virtual void OnTranslationCompleted(string translatedText)
         {

@@ -7,6 +7,8 @@ using System;
 using LingoShift.Application.Interfaces;
 using LingoShift.Services;
 using Avalonia.Threading;
+using System.Threading.Tasks;
+using System.Text;
 
 namespace LingoShift
 {
@@ -15,6 +17,9 @@ namespace LingoShift
         private TrayIconManager? _trayIconManager;
         private IClassicDesktopStyleApplicationLifetime? _desktopLifetime;
         private IServiceProvider? _serviceProvider;
+        private VoiceActivator voiceActivator;
+        private StringBuilder result = new StringBuilder();
+        private IPopupService _popupService;
 
         public override void Initialize()
         {
@@ -41,23 +46,70 @@ namespace LingoShift
                     var translationService = _serviceProvider.GetRequiredService<TranslationApplicationService>();
                     translationService.RegisterDefaultSequencesAsync();
 
-                    var popupService = _serviceProvider.GetRequiredService<IPopupService>();
+                    _popupService = _serviceProvider.GetRequiredService<IPopupService>();
                     var dispatcherService = _serviceProvider.GetRequiredService<IDispatcherService>();
 
                     translationService.TranslationCompleted += (sender, e) =>
                     {
                         dispatcherService.InvokeAsync(() =>
                         {
-                            popupService.ShowTranslationPopup(e.TranslatedText);
+                            _popupService.ShowTranslationPopup(e.TranslatedText);
                         });
                     };
                 });
 
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
+
+                StartVoiceRecognition();
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private void StartVoiceRecognition()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    var modelPath = @"C:\Users\CRS\Downloads\vosk-model-it-0.22\vosk-model-it-0.22";
+                    var activationPhrase = "ciao";
+                    var deactivationPhrase = "grazie";
+
+                    voiceActivator = new VoiceActivator(modelPath, activationPhrase, deactivationPhrase);
+
+                    voiceActivator.OnActivation += () =>
+                    {
+                        _popupService.ShowTranslationPopup("Assistente attivato!");
+                    };
+
+                    voiceActivator.OnTranscription += (transcription) =>
+                    {
+                        if (string.IsNullOrEmpty(transcription))
+                            return;
+                        //result.Append(transcription);
+                        //_popupService.UpdateTranslationPopup(result.ToString());
+                        _popupService.ShowTranslationPopup(transcription);
+                    };
+
+                    voiceActivator.OnDeactivation += () =>
+                    {
+                        _popupService.ShowTranslationPopup("Assistente disattivato!");
+                    };
+
+                    voiceActivator.Start();
+                }
+                catch (Exception ex)
+                {
+                    var popupService = _serviceProvider!.GetRequiredService<IPopupService>();
+                    var dispatcherService = _serviceProvider.GetRequiredService<IDispatcherService>();
+                    dispatcherService.InvokeAsync(() =>
+                    {
+                        popupService.ShowTranslationPopup(ex.Message);
+                    });
+                }
+            });
         }
 
 
