@@ -1,4 +1,3 @@
-<!--  XAML per TranslationPopup.xaml  -->
 <Window
     x:Class="LingoShift.Views.TranslationPopup"
     xmlns="https://github.com/avaloniaui"
@@ -20,33 +19,58 @@
     TransparencyLevelHint="AcrylicBlur"
     WindowStartupLocation="CenterScreen"
     mc:Ignorable="d">
+
+	<!--  Risorse per stili e colori  -->
+	<Window.Resources>
+		<!--  Font moderno  -->
+		<FontFamily x:Key="ModernFont">Segoe UI</FontFamily>
+
+		<!--  Colore accento  -->
+		<Color x:Key="AccentColor">#FF4CAF50</Color>
+
+		<!--  Pennello accento  -->
+		<SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+	</Window.Resources>
+
+	<!--  Definizione degli stili  -->
+	<Window.Styles>
+		<!--  Stile per il pulsante  -->
+		<Style Selector="Button.modern">
+			<Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+			<Setter Property="Foreground" Value="White" />
+			<Setter Property="Padding" Value="16,8" />
+			<Setter Property="CornerRadius" Value="4" />
+			<Setter Property="FontFamily" Value="{DynamicResource ModernFont}" />
+			<Setter Property="FontSize" Value="14" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Content" Value="{TemplateBinding Content}" />
+		</Style>
+
+		<!--  Effetto hover sul pulsante  -->
+		<Style Selector="Button.modern:pointerover">
+			<Setter Property="Background" Value="#FF388E3C" />
+		</Style>
+	</Window.Styles>
+
 	<Border ClipToBounds="True" CornerRadius="8">
 		<Panel>
 			<ExperimentalAcrylicBorder IsHitTestVisible="False">
 				<ExperimentalAcrylicBorder.Material>
 					<ExperimentalAcrylicMaterial
                         BackgroundSource="Digger"
-                        MaterialOpacity="0.6"
-                        TintColor="#2c3e50"
-                        TintOpacity="0.6" />
+                        MaterialOpacity="0.7"
+                        TintColor="#FFFFFFFF"
+                        TintOpacity="0.8" />
 				</ExperimentalAcrylicBorder.Material>
 			</ExperimentalAcrylicBorder>
 
 			<Grid Margin="20" RowDefinitions="Auto,*,Auto">
-				<!--  Barra di titolo trascinabile  -->
-				<TextBlock
-                    Grid.Row="0"
-                    Margin="0,10,0,20"
-                    HorizontalAlignment="Center"
-                    FontSize="24"
-                    FontWeight="Light"
-                    Foreground="#ecf0f1"
-                    Text="Translation Result" />
-
+				<!--  Barra del titolo trascinabile  -->
 				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
 					<TextBlock
+                        FontFamily="{DynamicResource ModernFont}"
                         FontSize="16"
-                        Foreground="#ecf0f1"
+                        Foreground="#FF212121"
                         Text="{Binding TranslatedText, Mode=OneWay}"
                         TextWrapping="Wrap" />
 				</ScrollViewer>
@@ -55,20 +79,9 @@
                     Grid.Row="2"
                     Margin="0,20,0,0"
                     HorizontalAlignment="Right"
+                    Classes="modern"
                     Click="CloseButton_Click"
-                    Content="Close">
-					<Button.Styles>
-						<Style Selector="Button">
-							<Setter Property="Background" Value="#3498db" />
-							<Setter Property="Foreground" Value="White" />
-							<Setter Property="Padding" Value="20,10" />
-							<Setter Property="CornerRadius" Value="4" />
-						</Style>
-						<Style Selector="Button:pointerover">
-							<Setter Property="Background" Value="#2980b9" />
-						</Style>
-					</Button.Styles>
-				</Button>
+                    Content="Close" />
 			</Grid>
 		</Panel>
 	</Border>
