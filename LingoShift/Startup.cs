@@ -1,65 +1,71 @@
 ﻿using LingoShift.Application.ApplicationServices;
 using LingoShift.Application.Interfaces;
 using LingoShift.Domain.DomainServices;
-using LingoShift.Infrastructure.Data;
+using LingoShift.Domain.Repositories;
+using LingoShift.Hubs;
 using LingoShift.Infrastructure.ExternalServices;
 using LingoShift.Infrastructure.PlatformSpecificServices;
 using LingoShift.Infrastructure.Repositories;
-using LingoShift.Infrastructure.Services;
 using LingoShift.Services;
 using LingoShift.ViewModels;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System;
+using Microsoft.Extensions.Logging;
 
-namespace LingoShift;
-
-public static class Startup
+namespace LingoShift
 {
-    public static void ConfigureServices(this IServiceCollection services)
+    public static class Startup
     {
-        services.AddSingleton<ITranslationProvider, GoogleTranslateAdapter>();
-        services.AddSingleton<IClipboardService, WindowsClipboardService>();
-        services.AddSingleton<IHotkeyService, WindowsHotkeyService>();
-        services.AddSingleton<WindowsNativeClipboardService>();
-        services.AddSingleton<IPopupService, AvaloniaPopupService>();
+        public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddLogging(configure => configure.AddConsole());
 
-        services.AddHttpClient();
+            services.AddSingleton<ITranslationProvider, GoogleTranslateAdapter>();
+            services.AddSingleton<IClipboardService, WindowsClipboardService>();
+            services.AddSingleton<IHotkeyService, WindowsHotkeyService>();
+            services.AddSingleton<WindowsNativeClipboardService>();
+            services.AddSingleton<IPopupService, AvaloniaPopupService>();
+            services.AddHttpClient();
 
-        // Database configuration
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite("Data Source=lingoshift.db"));
+            // MongoDB Configuration
+            services.Configure<MongoDbSettings>(option =>
+            {
+                new MongoDbSettings()
+                {
+                    DatabaseName = "LingoShift"
+                    ,
+                    ConnectionString = "mongodb://localhost:27017"
+                };
+            });
 
-        services.AddScoped<SettingsRepository>();
-        services.AddSingleton<IDispatcherService, AvaloniaDispatcherService>();
-        services.AddSingleton<ISettingsService, SettingsService>();
+            //services.AddSingleton<ITranscriptionService, SpeechRecognitionService>();
+            services.AddSingleton<ITranscriptionService>(sp =>
+                new VoskTranscriptionService(
+                    sp.GetRequiredService<ILogger<VoskTranscriptionService>>(),
+                    sp.GetRequiredService<IHubContext<TranscriptionHub>>(),
+                    @"C:\Users\CRS\Downloads\vosk-model-it-0.22\vosk-model-it-0.22"
+                )
+            );
 
-        //services.AddSingleton<ILlmService, OpenAiService>();
-        // services.AddSingleton<ILlmService, AnthropicService>();
-        services.AddSingleton<ILlmService, OllamaService>();
+            services.AddSingleton<ISequenceConfigRepository, MongoSequenceConfigRepository>();
 
-        services.AddSingleton<LlmApplicationService>();
+            services.AddSingleton<IDispatcherService, AvaloniaDispatcherService>();
+            services.AddSingleton<ILlmService, OllamaService>();
+            services.AddSingleton<LlmApplicationService>();
 
-        services.AddTransient<TranslationApplicationService>();
+            services.AddSingleton<WhisperTranscriptionService>();
+            services.AddTransient<TranslationApplicationService>();
 
-        services.AddTransient<MainViewModel>();
-        services.AddTransient<SettingsViewModel>(provider =>
-            new SettingsViewModel(
-                provider.GetRequiredService<ISettingsService>(),
-                provider.GetRequiredService<TranslationApplicationService>(),
-                provider.GetRequiredService<IDispatcherService>()
-            )
-        );
+            services.AddTransient<MainViewModel>();
 
-        services.AddSingleton<TrayIconManager>();
+            services.AddSingleton<TrayIconManager>();
+        }
     }
 
-    public static void InitializeDatabase(IServiceProvider serviceProvider)
+    public class MongoDbSettings
     {
-        using (var scope = serviceProvider.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.MigrateDatabase();
-        }
+        public string ConnectionString { get; set; }
+        public string DatabaseName { get; set; }
     }
 }

@@ -1,14 +1,14 @@
 ﻿using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
-using LingoShift.Application.ApplicationServices;
 using Avalonia.Controls;
 using System;
-using LingoShift.Application.Interfaces;
-using LingoShift.Services;
-using Avalonia.Threading;
-using System.Threading.Tasks;
 using System.Text;
+using LingoShift.Services;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Builder;
+using LingoShift.Hubs;
 
 namespace LingoShift
 {
@@ -17,9 +17,8 @@ namespace LingoShift
         private TrayIconManager? _trayIconManager;
         private IClassicDesktopStyleApplicationLifetime? _desktopLifetime;
         private IServiceProvider? _serviceProvider;
-        private VoiceActivator voiceActivator;
-        private StringBuilder result = new StringBuilder();
-        private IPopupService _popupService;
+        private StringBuilder _result = new();
+        private IHost _webHost;
 
         public override void Initialize()
         {
@@ -31,87 +30,70 @@ namespace LingoShift
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 _desktopLifetime = desktop;
-                var services = new ServiceCollection();
-                Startup.ConfigureServices(services);
-                _serviceProvider = services.BuildServiceProvider();
 
-                // Inizializza il database e altri servizi sul thread dell'UI
-                Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    Startup.InitializeDatabase(_serviceProvider);
+                // Create and start the web host
+                _webHost = CreateWebHostBuilder().Build();
+                _webHost.Start();
 
-                    _trayIconManager = _serviceProvider.GetRequiredService<TrayIconManager>();
-                    _trayIconManager.Initialize();
+                _serviceProvider = _webHost.Services;
 
-                    var translationService = _serviceProvider.GetRequiredService<TranslationApplicationService>();
-                    translationService.RegisterDefaultSequencesAsync();
-
-                    _popupService = _serviceProvider.GetRequiredService<IPopupService>();
-                    var dispatcherService = _serviceProvider.GetRequiredService<IDispatcherService>();
-
-                    translationService.TranslationCompleted += (sender, e) =>
-                    {
-                        dispatcherService.InvokeAsync(() =>
-                        {
-                            _popupService.ShowTranslationPopup(e.TranslatedText);
-                        });
-                    };
-                });
+                _trayIconManager = _serviceProvider.GetRequiredService<TrayIconManager>();
+                _trayIconManager.Initialize();
 
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
-
-                StartVoiceRecognition();
             }
 
             base.OnFrameworkInitializationCompleted();
         }
 
-        private void StartVoiceRecognition()
+        private IHostBuilder CreateWebHostBuilder()
         {
-            Task.Run(() =>
-            {
-                try
+            return Host.CreateDefaultBuilder()
+                .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    var modelPath = @"C:\Users\CRS\Downloads\vosk-model-it-0.22\vosk-model-it-0.22";
-                    var activationPhrase = "ciao";
-                    var deactivationPhrase = "grazie";
+                    webBuilder.UseKestrel()
+                        .UseUrls("http://localhost:5800")
+                        .ConfigureServices((hostContext, services) =>
+                        {
+                            var configuration = hostContext.Configuration;
+                            Startup.ConfigureServices(services, configuration);
 
-                    voiceActivator = new VoiceActivator(modelPath, activationPhrase, deactivationPhrase);
+                            services.AddControllers();
+                            services.AddEndpointsApiExplorer();
+                            services.AddSwaggerGen();
+                            services.AddSignalR();
 
-                    voiceActivator.OnActivation += () =>
-                    {
-                        _popupService.ShowTranslationPopup("Assistente attivato!");
-                    };
+                            // Rimuovi questa riga
+                            // services.AddSingleton<VoskTranscriptionService>(sp =>
+                            //     new VoskTranscriptionService(@"C:\Users\CRS\Downloads\vosk-model-it-0.22\vosk-model-it-0.22"));
 
-                    voiceActivator.OnTranscription += (transcription) =>
-                    {
-                        if (string.IsNullOrEmpty(transcription))
-                            return;
-                        //result.Append(transcription);
-                        //_popupService.UpdateTranslationPopup(result.ToString());
-                        _popupService.ShowTranslationPopup(transcription);
-                    };
+                            services.AddCors(options =>
+                            {
+                                options.AddDefaultPolicy(builder =>
+                                {
+                                    builder.WithOrigins("http://localhost:3000")
+                                        .AllowAnyHeader()
+                                        .AllowAnyMethod()
+                                        .AllowCredentials();
+                                });
+                            });
+                        })
+                        .Configure(app =>
+                        {
+                            app.UseRouting();
+                            app.UseCors();
+                            app.UseSwagger();
+                            app.UseSwaggerUI();
 
-                    voiceActivator.OnDeactivation += () =>
-                    {
-                        _popupService.ShowTranslationPopup("Assistente disattivato!");
-                    };
-
-                    voiceActivator.Start();
-                }
-                catch (Exception ex)
-                {
-                    var popupService = _serviceProvider!.GetRequiredService<IPopupService>();
-                    var dispatcherService = _serviceProvider.GetRequiredService<IDispatcherService>();
-                    dispatcherService.InvokeAsync(() =>
-                    {
-                        popupService.ShowTranslationPopup(ex.Message);
-                    });
-                }
-            });
+                            app.UseEndpoints(endpoints =>
+                            {
+                                endpoints.MapControllers();
+                                endpoints.MapHub<TranscriptionHub>("/transcriptionHub");
+                            });
+                        });
+                });
         }
-
 
         private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
         {
@@ -121,9 +103,11 @@ namespace LingoShift
         private void CleanupResources()
         {
             _trayIconManager?.Dispose();
+            _webHost?.StopAsync().Wait();
+            _webHost?.Dispose();
         }
 
-        public static new App? Current => Avalonia.Application.Current as App;
+        public new static App? Current => Avalonia.Application.Current as App;
 
         public void Shutdown()
         {

@@ -12,14 +12,6 @@ public partial class MainWindow : Window
 
     private void OpenSettings(object sender, RoutedEventArgs e)
     {
-        var settingsWindow = new Window
-        {
-            Title = "Settings",
-            Content = new SettingsView(),
-            Width = 400,
-            Height = 300
-        };
 
-        settingsWindow.Show();
     }
 }

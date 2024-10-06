@@ -5,7 +5,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using LingoShift.Application.Interfaces;
 using LingoShift.ViewModels;
-using LingoShift.Views;
 using System;
 
 namespace LingoShift;
@@ -14,13 +13,11 @@ public class TrayIconManager : IDisposable
 {
     private TrayIcon? _trayIcon;
     private MainViewModel _mainViewModel;
-    private SettingsViewModel _settingsViewModel;
     private IDispatcherService _dispatcherService;
-    
-    public TrayIconManager(MainViewModel mainViewModel, SettingsViewModel settingsViewModel, IDispatcherService dispatcherService)
+
+    public TrayIconManager(MainViewModel mainViewModel, IDispatcherService dispatcherService)
     {
         _mainViewModel = mainViewModel;
-        _settingsViewModel = settingsViewModel;
         _dispatcherService = dispatcherService;
     }
 
@@ -81,20 +78,9 @@ public class TrayIconManager : IDisposable
     {
         _dispatcherService.InvokeAsync(() =>
         {
-            var settingsWindow = new Window
-            {
-                Content = new SettingsView
-                {
-                    DataContext = _settingsViewModel
-                },
-                Title = "Settings",
-                Width = 400,
-                Height = 500
-            };
-            settingsWindow.Show();
+            // ToDo Open WebBrowser to specific url
         });
     }
-
     private void Exit(object? sender, EventArgs e)
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)

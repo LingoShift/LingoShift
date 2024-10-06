@@ -9,10 +9,10 @@ namespace LingoShift.Infrastructure.ExternalServices
     public class OpenAiService : ILlmService
     {
         private readonly HttpClient _httpClient;
-        private readonly SettingsRepository _settingsRepository;
+        private readonly MongoRepository _settingsRepository;
         private const string ApiUrl = "https://api.openai.com/v1/chat/completions";
 
-        public OpenAiService(HttpClient httpClient, SettingsRepository settingsRepository)
+        public OpenAiService(HttpClient httpClient, MongoRepository settingsRepository)
         {
             _httpClient = httpClient;
             _settingsRepository = settingsRepository;
@@ -21,7 +21,7 @@ namespace LingoShift.Infrastructure.ExternalServices
         public async Task<LlmResponse> GenerateResponseAsync(LlmPrompt prompt)
         {
             var apiKey = await _settingsRepository.GetSettingAsync("OpenAiApiKey");
-            if (string.IsNullOrEmpty(apiKey))
+            if (string.IsNullOrEmpty(apiKey.Key))
             {
                 throw new InvalidOperationException("OpenAI API key is not set. Please configure it in the settings.");
             }
@@ -38,7 +38,7 @@ namespace LingoShift.Infrastructure.ExternalServices
             var json = JsonSerializer.Serialize(requestBody);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Key);
 
             var response = await _httpClient.PostAsync(ApiUrl, content);
             response.EnsureSuccessStatusCode();

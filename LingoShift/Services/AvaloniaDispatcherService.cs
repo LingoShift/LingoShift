@@ -1,7 +1,9 @@
+using System;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using LingoShift.Application.Interfaces;
-using System.Threading.Tasks;
-using System;
+
+namespace LingoShift.Services;
 
 public class AvaloniaDispatcherService : IDispatcherService
 {

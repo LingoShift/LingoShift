@@ -1,4 +1,4 @@
 {
-    "accessibility.voice.autoSynthesize": true,
+    "accessibility.voice.autoSynthesize": "on",
     "accessibility.voice.keywordActivation": "inlineChat"
 }

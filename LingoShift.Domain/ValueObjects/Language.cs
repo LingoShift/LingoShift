@@ -1,28 +1,45 @@
-﻿namespace LingoShift.Domain.ValueObjects;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
-public record SourceText(string Value);
-public record TranslatedText(string Value);
-
-public class Language
+namespace LingoShift.Domain.ValueObjects
 {
-    public string Code { get; set; }
-    public string Name { get; set; }
-    public static Language English { get; } = new Language("en", "English");
-    public static Language Italian { get; } = new Language("it", "Italian");
-    public static Language Spanish { get; } = new Language("es", "Spanish");
-
-    public Language() { }
-
-    public Language(string code, string name)
+    public class Language
     {
-        Code = code;
-        Name = name;
-    }
+        public string Value { get; }
 
-    public static IEnumerable<Language> GetValues()
-    {
-        yield return English;
-        yield return Italian;
-        yield return Spanish;
+        private Language(string value)
+        {
+            Value = value;
+        }
+
+        public static Language FromString(string value)
+        {
+            return GetValues().FirstOrDefault(l => l.Value.Equals(value, StringComparison.OrdinalIgnoreCase)) 
+                ?? throw new ArgumentException($"Invalid Language value: {value}");
+        }
+
+        public static implicit operator string(Language language) => language.Value;
+
+        public override string ToString() => Value;
+
+        public override bool Equals(object obj)
+        {
+            if (obj is Language language)
+            {
+                return Value.Equals(language.Value, StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        public override int GetHashCode() => Value.GetHashCode();
+
+        public static IEnumerable<Language> GetValues()
+        {
+            yield return new Language("English");
+            yield return new Language("Spanish");
+            yield return new Language("French");
+            // Add more languages as needed
+        }
     }
 }
